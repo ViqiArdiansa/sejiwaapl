@@ -937,6 +937,9 @@
         </div>
     </main>
 
+    <!-- Tambahkan library Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <div class="modal-overlay" id="global-modal-overlay">
         <div class="modal" id="global-modal">
             <div class="card-header">
@@ -953,6 +956,12 @@
     </div>
 
     <script>
+        // --- INISIALISASI SUPABASE ---
+        // TODO: Ganti URL dan KEY di bawah ini dengan kredensial dari project Supabase-mu
+        const SUPABASE_URL = 'https://wxehfwtgrtjqifhoejdt.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZWhmd3RncnRqcWlmaG9lamR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNTg3NzUsImV4cCI6MjA5MTgzNDc3NX0.Xr1vvfOSYUYE4QwgirfWD5AUDS8GlpQACM9X0aZoHiM';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         function toggleChat() {
     const chatWin = document.getElementById('chat-window');
     chatWin.style.display = chatWin.style.display === 'none' || chatWin.style.display === '' ? 'flex' : 'none';
@@ -1611,15 +1620,28 @@ function selectSkriningOption(element, value) {
     openModal(
         "Tulis Jurnal Hari Ini",
         `<textarea id="journal-text-input" class="input-group" style="height: 150px; width:100%" placeholder="Bagaimana perasaanmu hari ini?"></textarea>`,
-        () => {
+        async () => {
             const text = document.getElementById('journal-text-input').value;
             if(text.trim() === "") return alert("Isi jurnal dulu, Viqi!");
 
+            const dateStr = new Date().toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+
             // Simpan ke database APP_DATA
             APP_DATA.journals.unshift({
-                date: new Date().toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }),
+                date: dateStr,
                 content: text
             });
+
+            // Simpan ke database Supabase
+            try {
+                const { error } = await supabaseClient
+                    .from('journals')
+                    .insert([{ date: dateStr, content: text, user_email: APP_DATA.user.email }]);
+                
+                if (error) throw error;
+            } catch (err) {
+                console.error("Gagal simpan ke Supabase:", err);
+            }
 
             alert("Jurnal berhasil disimpan ke Riwayat!");
             closeModal();
@@ -1632,6 +1654,32 @@ function selectSkriningOption(element, value) {
 
         function sosAlert() {
             confirm("PANGGILAN DARURAT: Menghubungi Hotline Sejiwa (Kemenkes 119). Lanjutkan?");
+        }
+
+        // Fungsi menyimpan pengaturan akun ke Supabase
+        async function saveSettings() {
+            const name = document.getElementById('pref-name').value || APP_DATA.user.name;
+            const email = document.getElementById('pref-email').value || APP_DATA.user.email;
+            const isAnon = document.getElementById('pref-anon').checked;
+
+            // Update UI Lokal
+            APP_DATA.user.name = name;
+            APP_DATA.user.email = email;
+            document.getElementById('sidebar-display-name').innerText = name;
+            document.getElementById('hero-greeting').innerText = `Halo, ${name.split(' ')[0]}!`;
+
+            // Simpan ke Supabase
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .upsert([{ email: email, full_name: name, is_anonymous: isAnon }], { onConflict: 'email' });
+                
+                if (error) throw error;
+                alert("Pengaturan profil berhasil disimpan ke Supabase!");
+            } catch (err) {
+                console.error("Gagal simpan profil:", err);
+                alert("Terjadi kesalahan saat menyimpan ke database Supabase.");
+            }
         }
 
         // Dataset untuk rekomendasi topik
@@ -1991,7 +2039,7 @@ function playSound(type) {
     
     <div id="chat-messages" style="flex: 1; padding: 15px; overflow-y: auto; background: var(--gray-100); display: flex; flex-direction: column; gap: 10px;">
         <div style="background: white; padding: 10px; border-radius: 0 12px 12px 12px; font-size: 0.85rem; max-width: 85%; align-self: flex-start; box-shadow: var(--shadow-sm);">
-            Halo! Saya AI Sejiwa. Ada yang bisa saya bantu terkait kesehatan mentalmu hari ini?
+            Halo Moch. Viqi! Saya AI Sejiwa. Ada yang bisa saya bantu terkait kesehatan mentalmu hari ini?
         </div>
     </div>
 
